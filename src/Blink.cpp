@@ -7,14 +7,19 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 #include <Adafruit_NeoPixel.h>
+#include <IWatchdog.h>
 
 // 定义LED灯引脚
 #ifdef ARDUINO_GENERIC_STM32F103RC
 #define LED_BUILTIN_1 PC7
 #define LED_BUILTIN_2 PC6
+#define LED_BUILTIN_ON LOW
+#define LED_BUILTIN_OFF HIGH
 #elif ARDUINO_GENERIC_STM32F103VE
 #define LED_BUILTIN_1 PB14
 #define LED_BUILTIN_2 PB13
+#define LED_BUILTIN_ON LOW
+#define LED_BUILTIN_OFF HIGH
 #endif
 
 // 定义CAN缓冲区长度
@@ -140,6 +145,7 @@ PixelMode *m_pixelMode[8] = {
     &pixelMode_4, &pixelMode_5, &pixelMode_6, &pixelMode_7};
 
 // 定义FreeRTOS任务句柄
+TaskHandle_t handleHeartbeat = NULL;
 TaskHandle_t handleNeoPixel_0 = NULL;
 TaskHandle_t handleNeoPixel_1 = NULL;
 TaskHandle_t handleNeoPixel_2 = NULL;
@@ -155,9 +161,11 @@ TaskHandle_t *m_handleNeoPixel[8] = {
 
 // 定义FreeRTOS任务函数
 void TaskBlink(void *pvParameters);
+void TaskHeartbeat(void *pvParameters);
 void TaskSerial(void *pvParameters);
 void TaskNeoPixel(void *pvParameters);
-// 灯带模式函数
+
+// 定义LED灯带模式函数
 void LightStripMode_0(uint8_t index);
 void LightStripMode_1(uint8_t index);
 void LightStripMode_2(uint8_t index);
@@ -180,6 +188,8 @@ void setup()
   // 初始化LED引脚
   pinMode(LED_BUILTIN_1, OUTPUT);
   pinMode(LED_BUILTIN_2, OUTPUT);
+  digitalWrite(LED_BUILTIN_1, LED_BUILTIN_OFF);
+  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
   // 初始化串口
   Serial.begin(115200);
   Serial.setTimeout(10); // 设置串口接收超时时间为10ms
@@ -202,6 +212,7 @@ void setup()
   xTaskCreate(TaskNeoPixel, "NeoPixel[5]", 128, m_pixelMode[5], 2, m_handleNeoPixel[5]);
   xTaskCreate(TaskNeoPixel, "NeoPixel[6]", 128, m_pixelMode[6], 2, m_handleNeoPixel[6]);
   xTaskCreate(TaskNeoPixel, "NeoPixel[7]", 128, m_pixelMode[7], 2, m_handleNeoPixel[7]);
+  IWatchdog.begin(10000000); // 初始化看门狗定时器，设置超时时间为10秒
   vTaskStartScheduler();
 }
 
@@ -220,16 +231,25 @@ void TaskBlink(void *pvParameters)
 {
   for (;;)
   {
-    digitalWrite(LED_BUILTIN_1, HIGH);
-    digitalWrite(LED_BUILTIN_2, LOW);
-    // wait for a second
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    digitalWrite(LED_BUILTIN_1, LED_BUILTIN_ON);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
 
-    digitalWrite(LED_BUILTIN_1, LOW);
-    digitalWrite(LED_BUILTIN_2, HIGH);
-    // wait for a second
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    digitalWrite(LED_BUILTIN_1, LED_BUILTIN_OFF);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    IWatchdog.reload();
   }
+}
+
+void TaskHeartbeat(void *pvParameters)
+{
+  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_ON);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_ON);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
+  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
+  vTaskDelete(NULL); // 删除当前任务
 }
 
 void TaskSerial(void *pvParameters)
@@ -245,14 +265,17 @@ void TaskSerial(void *pvParameters)
       if (len < CAN_BUFFER_LEN || buffer[0] != 0x02 || index >= NUM_CHN_MAX)
         continue;
 
+      if (handleHeartbeat != NULL)
+        vTaskDelete(handleHeartbeat);                                          // 删除心跳任务
+      xTaskCreate(TaskHeartbeat, "Heartbeat", 128, NULL, 2, &handleHeartbeat); // 创建心跳任务
       // LED灯带控制
       m_pixelMode[index]->color = Adafruit_NeoPixel::Color(buffer[6], buffer[7], buffer[8]); // 更新颜色
       m_pixelMode[index]->mode = buffer[9];                                                  // 更新模式
       m_pixelMode[index]->brightness = buffer[10];                                           // 更新亮度
       m_pixelMode[index]->speed = buffer[11];                                                // 更新速度
       Serial.write(buffer, CAN_BUFFER_LEN);
-      vTaskDelete(*m_handleNeoPixel[index]); // 删除当前任务
-      xTaskCreate(TaskNeoPixel, "NeoPixel", 128, m_pixelMode[index], 2, m_handleNeoPixel[index]);
+      vTaskDelete(*m_handleNeoPixel[index]);                                                      // 删除当前LED灯带任务
+      xTaskCreate(TaskNeoPixel, "NeoPixel", 128, m_pixelMode[index], 2, m_handleNeoPixel[index]); // 创建新的LED灯带任务
     }
   }
 }
