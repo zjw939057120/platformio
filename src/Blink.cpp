@@ -157,7 +157,24 @@ TaskHandle_t *m_handleNeoPixel[8] = {
 void TaskBlink(void *pvParameters);
 void TaskSerial(void *pvParameters);
 void TaskNeoPixel(void *pvParameters);
-
+// 灯带模式函数
+void LightStripMode_0(uint8_t index);
+void LightStripMode_1(uint8_t index);
+void LightStripMode_2(uint8_t index);
+void LightStripMode_3(uint8_t index);
+void LightStripMode_4(uint8_t index);
+void LightStripMode_5(uint8_t index);
+void LightStripMode_6(uint8_t index);
+void LightStripMode_7(uint8_t index);
+void LightStripMode_8(uint8_t index);
+void LightStripMode_9(uint8_t index);
+void LightStripMode_10(uint8_t index);
+void LightStripMode_11(uint8_t index);
+void LightStripMode_12(uint8_t index);
+void LightStripMode_13(uint8_t index);
+void LightStripMode_14(uint8_t index);
+void LightStripMode_15(uint8_t index);
+void LightStripMode_255(uint8_t index);
 void setup()
 {
   // 初始化LED引脚
@@ -223,10 +240,9 @@ void TaskSerial(void *pvParameters)
     if (Serial.available() > 0)
     {
       size_t len = Serial.readBytes(buffer, CAN_BUFFER_LEN);
-      uint8_t index = buffer[5];
-      if (index > NUM_CHN_MAX)
-        break;                                                                               // 如果索引值大于最大通道数，则跳出循环。                                                                           // 如果索引值大于最大通道数，则不处理
-                                                                                             // 获取索引值
+      uint8_t index = buffer[5]; // 获取索引值
+      if (index >= NUM_CHN_MAX)
+        break;                                                                               // 如果索引值超过最大通道数，退出任务
       m_pixelMode[index]->color = Adafruit_NeoPixel::Color(buffer[6], buffer[7], buffer[8]); // 更新颜色
       m_pixelMode[index]->mode = buffer[9];                                                  // 更新模式
       m_pixelMode[index]->speed = buffer[10];                                                // 更新速度
@@ -249,27 +265,179 @@ void TaskNeoPixel(void *pvParameters)
     switch (m_pixelMode[index]->mode)
     {
     case 0:
-      m_pixels[index]->fill(m_pixelMode[index]->color); // 设置颜色为红色
-      m_pixels[index]->show();
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-      // vTaskDelete(NULL); // 删除当前任务
+      LightStripMode_0(index); // 全亮模式`
       break;
     case 1:
-      for (int i = 0; i < m_pixelMode[index]->length / 32; i++)
-      {
-        for (size_t j = 0; j < 32; j++)
-        {
-          m_pixels[index]->setPixelColor(i * 32 + j, rainbowColors32[j]);
-          m_pixels[index]->show();
-          vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
-      }
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-      // vTaskDelete(NULL); // 删除当前任务
+      LightStripMode_1(index); // 逐个亮模式
+      break;
+    case 2:
+      LightStripMode_2(index); // 彩虹模式
+      break;
+    case 3:
+      LightStripMode_3(index);
+      break;
+    case 4:
+      LightStripMode_4(index);
+      break;
+    case 5:
+      LightStripMode_5(index);
+      break;
+    case 6:
+      LightStripMode_6(index);
+      break;
+    case 7:
+      LightStripMode_7(index);
+      break;
+    case 8:
+      LightStripMode_8(index);
+      break;
+    case 9:
+      LightStripMode_9(index);
+      break;
+    case 10:
+      LightStripMode_10(index);
+      break;
+    case 11:
+      LightStripMode_11(index);
+      break;
+    case 12:
+      LightStripMode_12(index);
+      break;
+    case 13:
+      LightStripMode_13(index);
+      break;
+    case 14:
+      LightStripMode_14(index);
+      break;
+    case 15:
+      LightStripMode_15(index);
+      break;
+    case 255:
+      LightStripMode_255(index); // 默认模式
       break;
     default:
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-      // vTaskDelete(NULL); // 删除当前任务
+      LightStripMode_255(index);
     }
   }
+}
+
+void LightStripMode_0(uint8_t index)
+{
+  // 全亮模式
+  m_pixels[index]->fill(m_pixelMode[index]->color);
+  m_pixels[index]->show();
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_1(uint8_t index)
+{
+  // 逐个亮模式
+  for (int i = 0; i < m_pixelMode[index]->length; i++)
+  {
+    m_pixels[index]->setPixelColor(i, m_pixelMode[index]->color);
+    m_pixels[index]->show();
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+  // vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_2(uint8_t index)
+{
+  // 彩虹模式
+  for (int i = 0; i < m_pixelMode[index]->length / 32; i++)
+  {
+    for (size_t j = 0; j < 32; j++)
+    {
+      m_pixels[index]->setPixelColor(i * 32 + j, rainbowColors32[j]);
+      m_pixels[index]->show();
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+  }
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  // vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_3(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_4(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_5(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_6(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_7(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_8(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_9(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_10(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_11(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_12(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_13(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_14(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_15(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_255(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
 }
