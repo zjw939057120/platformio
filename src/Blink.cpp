@@ -182,7 +182,7 @@ void setup()
   pinMode(LED_BUILTIN_2, OUTPUT);
   // 初始化串口
   Serial.begin(115200);
-  Serial.setTimeout(64); // 设置串口接收超时时间为5ms
+  Serial.setTimeout(10); // 设置串口接收超时时间为10ms
   // 初始化LED灯带
 
   for (size_t i = 0; i < NUM_CHN_MAX; i++)
@@ -241,12 +241,15 @@ void TaskSerial(void *pvParameters)
     {
       size_t len = Serial.readBytes(buffer, CAN_BUFFER_LEN);
       uint8_t index = buffer[5]; // 获取索引值
-      if (index >= NUM_CHN_MAX)
-        break;                                                                               // 如果索引值超过最大通道数，退出任务
+      // 判断数据包是否合法
+      if (len < CAN_BUFFER_LEN || buffer[0] != 0x02 || index >= NUM_CHN_MAX)
+        continue;
+
+      // LED灯带控制
       m_pixelMode[index]->color = Adafruit_NeoPixel::Color(buffer[6], buffer[7], buffer[8]); // 更新颜色
       m_pixelMode[index]->mode = buffer[9];                                                  // 更新模式
-      m_pixelMode[index]->speed = buffer[10];                                                // 更新速度
-      m_pixelMode[index]->brightness = buffer[11];                                           // 更新亮度
+      m_pixelMode[index]->brightness = buffer[10];                                           // 更新亮度
+      m_pixelMode[index]->speed = buffer[11];                                                // 更新速度
       Serial.write(buffer, CAN_BUFFER_LEN);
       vTaskDelete(*m_handleNeoPixel[index]); // 删除当前任务
       xTaskCreate(TaskNeoPixel, "NeoPixel", 128, m_pixelMode[index], 2, m_handleNeoPixel[index]);
@@ -317,6 +320,7 @@ void TaskNeoPixel(void *pvParameters)
       break;
     default:
       LightStripMode_255(index);
+      break;
     }
   }
 }
