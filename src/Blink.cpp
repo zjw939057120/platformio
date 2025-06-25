@@ -202,16 +202,16 @@ void setup()
   }
 
   // 创建FreeRTOS任务
+  xTaskCreate(TaskSerial, "Serial", 128, NULL, 1, NULL);
   xTaskCreate(TaskBlink, "Blink", 128, NULL, 2, NULL);
-  xTaskCreate(TaskSerial, "Serial", 128, NULL, 2, NULL);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[0]", 128, m_pixelMode[0], 2, m_handleNeoPixel[0]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[1]", 128, m_pixelMode[1], 2, m_handleNeoPixel[1]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[2]", 128, m_pixelMode[2], 2, m_handleNeoPixel[2]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[3]", 128, m_pixelMode[3], 2, m_handleNeoPixel[3]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[4]", 128, m_pixelMode[4], 2, m_handleNeoPixel[4]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[5]", 128, m_pixelMode[5], 2, m_handleNeoPixel[5]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[6]", 128, m_pixelMode[6], 2, m_handleNeoPixel[6]);
-  xTaskCreate(TaskNeoPixel, "NeoPixel[7]", 128, m_pixelMode[7], 2, m_handleNeoPixel[7]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[0]", 128, m_pixelMode[0], 3, m_handleNeoPixel[0]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[1]", 128, m_pixelMode[1], 4, m_handleNeoPixel[1]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[2]", 128, m_pixelMode[2], 5, m_handleNeoPixel[2]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[3]", 128, m_pixelMode[3], 6, m_handleNeoPixel[3]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[4]", 128, m_pixelMode[4], 7, m_handleNeoPixel[4]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[5]", 128, m_pixelMode[5], 8, m_handleNeoPixel[5]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[6]", 128, m_pixelMode[6], 9, m_handleNeoPixel[6]);
+  xTaskCreate(TaskNeoPixel, "NeoPixel[7]", 128, m_pixelMode[7], 10, m_handleNeoPixel[7]);
   IWatchdog.begin(10000000); // 初始化看门狗定时器，设置超时时间为10秒
   vTaskStartScheduler();
 }
@@ -268,13 +268,21 @@ void TaskSerial(void *pvParameters)
       if (handleHeartbeat != NULL)
         vTaskDelete(handleHeartbeat);                                          // 删除心跳任务
       xTaskCreate(TaskHeartbeat, "Heartbeat", 128, NULL, 2, &handleHeartbeat); // 创建心跳任务
+
       // LED灯带控制
       m_pixelMode[index]->color = Adafruit_NeoPixel::Color(buffer[6], buffer[7], buffer[8]); // 更新颜色
       m_pixelMode[index]->mode = buffer[9];                                                  // 更新模式
       m_pixelMode[index]->brightness = buffer[10];                                           // 更新亮度
       m_pixelMode[index]->speed = buffer[11];                                                // 更新速度
+
+      // 发送数据到串口
+      taskENTER_CRITICAL();
       Serial.write(buffer, CAN_BUFFER_LEN);
-      vTaskDelete(*m_handleNeoPixel[index]);                                                      // 删除当前LED灯带任务
+      Serial.flush();
+      taskEXIT_CRITICAL();
+
+      if (m_handleNeoPixel[index] != NULL)     // 如果当前LED灯带任务句柄不为空
+        vTaskDelete(*m_handleNeoPixel[index]); // 删除当前LED灯带任务
       xTaskCreate(TaskNeoPixel, "NeoPixel", 128, m_pixelMode[index], 2, m_handleNeoPixel[index]); // 创建新的LED灯带任务
     }
   }
