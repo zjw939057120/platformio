@@ -11,13 +11,18 @@
 
 // 定义LED灯引脚
 #ifdef ARDUINO_GENERIC_STM32F103RC
+
 #define LED_BUILTIN_1 PC7
-#define LED_BUILTIN_2 PC6
 #define LED_BUILTIN_ON LOW
 #define LED_BUILTIN_OFF HIGH
+
 #elif ARDUINO_GENERIC_STM32F103VE
 #define LED_BUILTIN_1 PB14
-#define LED_BUILTIN_2 PB13
+#define LED_BUILTIN_ON LOW
+#define LED_BUILTIN_OFF HIGH
+
+#else
+#define LED_BUILTIN_1 PC13
 #define LED_BUILTIN_ON LOW
 #define LED_BUILTIN_OFF HIGH
 #endif
@@ -187,9 +192,7 @@ void setup()
 {
   // 初始化LED引脚
   pinMode(LED_BUILTIN_1, OUTPUT);
-  pinMode(LED_BUILTIN_2, OUTPUT);
   digitalWrite(LED_BUILTIN_1, LED_BUILTIN_OFF);
-  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
   // 初始化串口
   Serial.begin(115200);
   Serial.setTimeout(10); // 设置串口接收超时时间为10ms
@@ -242,13 +245,13 @@ void TaskBlink(void *pvParameters)
 
 void TaskHeartbeat(void *pvParameters)
 {
-  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_ON);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_ON);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
-  digitalWrite(LED_BUILTIN_2, LED_BUILTIN_OFF);
+  for (size_t i = 0; i < 4; i++)
+  {
+    digitalWrite(LED_BUILTIN_1, LED_BUILTIN_ON);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+    digitalWrite(LED_BUILTIN_1, LED_BUILTIN_OFF);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+  }
   vTaskDelete(NULL); // 删除当前任务
 }
 
@@ -281,8 +284,8 @@ void TaskSerial(void *pvParameters)
       Serial.flush();
       taskEXIT_CRITICAL();
 
-      if (m_handleNeoPixel[index] != NULL)     // 如果当前LED灯带任务句柄不为空
-        vTaskDelete(*m_handleNeoPixel[index]); // 删除当前LED灯带任务
+      if (m_handleNeoPixel[index] != NULL)                                                        // 如果当前LED灯带任务句柄不为空
+        vTaskDelete(*m_handleNeoPixel[index]);                                                    // 删除当前LED灯带任务
       xTaskCreate(TaskNeoPixel, "NeoPixel", 128, m_pixelMode[index], 2, m_handleNeoPixel[index]); // 创建新的LED灯带任务
     }
   }
