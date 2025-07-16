@@ -20,42 +20,50 @@
 #define LED_BUILTIN_1 PB14
 #define LED_BUILTIN_ON LOW
 #define LED_BUILTIN_OFF HIGH
-
-#else
-#define LED_BUILTIN_1 PC13
-#define LED_BUILTIN_ON LOW
-#define LED_BUILTIN_OFF HIGH
 #endif
 
 // 定义CAN缓冲区长度
 #define CAN_BUFFER_LEN 13
 
-#define NUM_CHN_MAX 8       // 定义最大通道数
+#define NUM_CHN_MAX 4       // 定义最大通道数
 #define NUM_PIXELS_MAX 1024 // 定义最大像素数量
 // 定义LED灯带引脚和数量
+#ifdef ARDUINO_GENERIC_STM32F103RC
 #define PIN_PIXELS_0 PC0
-#define NUM_PIXELS_0 64
-
+#define NUM_PIXELS_0 NUM_PIXELS_MAX
 #define PIN_PIXELS_1 PC1
-#define NUM_PIXELS_1 64
-
+#define NUM_PIXELS_1 NUM_PIXELS_MAX
 #define PIN_PIXELS_2 PC2
-#define NUM_PIXELS_2 64
-
+#define NUM_PIXELS_2 NUM_PIXELS_MAX
 #define PIN_PIXELS_3 PC3
-#define NUM_PIXELS_3 64
-
+#define NUM_PIXELS_3 NUM_PIXELS_MAX
 #define PIN_PIXELS_4 PA4
-#define NUM_PIXELS_4 64
-
+#define NUM_PIXELS_4 NUM_PIXELS_MAX
 #define PIN_PIXELS_5 PA5
-#define NUM_PIXELS_5 64
-
+#define NUM_PIXELS_5 NUM_PIXELS_MAX
 #define PIN_PIXELS_6 PA6
-#define NUM_PIXELS_6 64
-
+#define NUM_PIXELS_6 NUM_PIXELS_MAX
 #define PIN_PIXELS_7 PA7
-#define NUM_PIXELS_7 64
+#define NUM_PIXELS_7 NUM_PIXELS_MAX
+
+#elif ARDUINO_GENERIC_STM32F103VE
+#define PIN_PIXELS_0 PC0
+#define NUM_PIXELS_0 NUM_PIXELS_MAX
+#define PIN_PIXELS_1 PC1
+#define NUM_PIXELS_1 NUM_PIXELS_MAX
+#define PIN_PIXELS_2 PC2
+#define NUM_PIXELS_2 NUM_PIXELS_MAX
+#define PIN_PIXELS_3 PC3
+#define NUM_PIXELS_3 NUM_PIXELS_MAX
+#define PIN_PIXELS_4 PA4
+#define NUM_PIXELS_4 NUM_PIXELS_MAX
+#define PIN_PIXELS_5 PA5
+#define NUM_PIXELS_5 NUM_PIXELS_MAX
+#define PIN_PIXELS_6 PA6
+#define NUM_PIXELS_6 NUM_PIXELS_MAX
+#define PIN_PIXELS_7 PA7
+#define NUM_PIXELS_7 NUM_PIXELS_MAX
+#endif
 
 #define DELAYVAL 500
 // 定义LED灯带颜色数组
@@ -167,7 +175,7 @@ TaskHandle_t *m_handleNeoPixel[8] = {
 // 定义FreeRTOS任务函数
 void TaskBlink(void *pvParameters);
 void TaskHeartbeat(void *pvParameters);
-void TaskSerial(void *pvParameters);
+void TaskSerial1(void *pvParameters);
 void TaskNeoPixel(void *pvParameters);
 
 // 定义LED灯带模式函数
@@ -187,15 +195,27 @@ void LightStripMode_12(uint8_t index);
 void LightStripMode_13(uint8_t index);
 void LightStripMode_14(uint8_t index);
 void LightStripMode_15(uint8_t index);
+void LightStripMode_16(uint8_t index);
+void LightStripMode_17(uint8_t index);
+void LightStripMode_18(uint8_t index);
+void LightStripMode_19(uint8_t index);
+void LightStripMode_20(uint8_t index);
 void LightStripMode_255(uint8_t index);
+
+HardwareSerial MySerial1(USART1); // 使用 USART1 PA9 PA10
+HardwareSerial MySerial2(USART2); // 使用 USART2 PA2 PA2
+HardwareSerial MySerial3(USART3); // 使用 USART3 PB10 PB11
+
 void setup()
 {
   // 初始化LED引脚
   pinMode(LED_BUILTIN_1, OUTPUT);
   digitalWrite(LED_BUILTIN_1, LED_BUILTIN_OFF);
   // 初始化串口
-  Serial.begin(115200);
-  Serial.setTimeout(10); // 设置串口接收超时时间为10ms
+  MySerial1.begin(115200);
+  MySerial2.begin(115200);
+  MySerial1.setTimeout(10); // 设置串口接收超时时间为10ms
+  MySerial2.setTimeout(10); // 设置串口接收超时时间为10ms
   // 初始化LED灯带
 
   for (size_t i = 0; i < NUM_CHN_MAX; i++)
@@ -205,7 +225,7 @@ void setup()
   }
 
   // 创建FreeRTOS任务
-  xTaskCreate(TaskSerial, "Serial", 128, NULL, 1, NULL);
+  xTaskCreate(TaskSerial1, "Serial1", 128, NULL, 1, NULL);
   xTaskCreate(TaskBlink, "Blink", 128, NULL, 2, NULL);
   xTaskCreate(TaskNeoPixel, "NeoPixel[0]", 128, m_pixelMode[0], 3, m_handleNeoPixel[0]);
   xTaskCreate(TaskNeoPixel, "NeoPixel[1]", 128, m_pixelMode[1], 4, m_handleNeoPixel[1]);
@@ -255,14 +275,14 @@ void TaskHeartbeat(void *pvParameters)
   vTaskDelete(NULL); // 删除当前任务
 }
 
-void TaskSerial(void *pvParameters)
+void TaskSerial1(void *pvParameters)
 {
   for (;;)
   {
     uint8_t buffer[CAN_BUFFER_LEN] = {0};
-    if (Serial.available() > 0)
+    if (MySerial1.available() > 0)
     {
-      size_t len = Serial.readBytes(buffer, CAN_BUFFER_LEN);
+      size_t len = MySerial1.readBytes(buffer, CAN_BUFFER_LEN);
       uint8_t index = buffer[5]; // 获取索引值
       // 判断数据包是否合法
       if (len < CAN_BUFFER_LEN || buffer[0] != 0x02 || index >= NUM_CHN_MAX)
@@ -280,8 +300,8 @@ void TaskSerial(void *pvParameters)
 
       // 发送数据到串口
       taskENTER_CRITICAL();
-      Serial.write(buffer, CAN_BUFFER_LEN);
-      Serial.flush();
+      MySerial1.write(buffer, CAN_BUFFER_LEN);
+      MySerial1.flush();
       taskEXIT_CRITICAL();
 
       if (m_handleNeoPixel[index] != NULL)                                                        // 如果当前LED灯带任务句柄不为空
@@ -302,13 +322,13 @@ void TaskNeoPixel(void *pvParameters)
     switch (m_pixelMode[index]->mode)
     {
     case 0:
-      LightStripMode_0(index); // 全亮模式`
+      LightStripMode_0(index);
       break;
     case 1:
-      LightStripMode_1(index); // 逐个亮模式
+      LightStripMode_1(index);
       break;
     case 2:
-      LightStripMode_2(index); // 彩虹模式
+      LightStripMode_2(index);
       break;
     case 3:
       LightStripMode_3(index);
@@ -349,8 +369,20 @@ void TaskNeoPixel(void *pvParameters)
     case 15:
       LightStripMode_15(index);
       break;
-    case 255:
-      LightStripMode_255(index); // 默认模式
+    case 16:
+      LightStripMode_16(index);
+      break;
+    case 17:
+      LightStripMode_17(index);
+      break;
+    case 18:
+      LightStripMode_18(index);
+      break;
+    case 19:
+      LightStripMode_19(index);
+      break;
+    case 20:
+      LightStripMode_20(index);
       break;
     default:
       LightStripMode_255(index);
@@ -361,6 +393,15 @@ void TaskNeoPixel(void *pvParameters)
 
 void LightStripMode_0(uint8_t index)
 {
+  // 全熄模式
+  m_pixels[index]->clear();
+  m_pixels[index]->show();
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_1(uint8_t index)
+{
   // 全亮模式
   m_pixels[index]->fill(m_pixelMode[index]->color);
   m_pixels[index]->show();
@@ -368,7 +409,7 @@ void LightStripMode_0(uint8_t index)
   vTaskDelete(NULL); // 删除当前任务
 }
 
-void LightStripMode_1(uint8_t index)
+void LightStripMode_2(uint8_t index)
 {
   // 逐个亮模式
   for (int i = 0; i < m_pixelMode[index]->length; i++)
@@ -377,10 +418,11 @@ void LightStripMode_1(uint8_t index)
     m_pixels[index]->show();
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
-  // vTaskDelete(NULL); // 删除当前任务
+  if (m_pixelMode[index]->speed == 0)
+    vTaskDelete(NULL); // 删除当前任务
 }
 
-void LightStripMode_2(uint8_t index)
+void LightStripMode_3(uint8_t index)
 {
   // 彩虹模式
   for (int i = 0; i < m_pixelMode[index]->length / 32; i++)
@@ -393,13 +435,8 @@ void LightStripMode_2(uint8_t index)
     }
   }
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-  // vTaskDelete(NULL); // 删除当前任务
-}
-
-void LightStripMode_3(uint8_t index)
-{
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-  vTaskDelete(NULL); // 删除当前任务
+  if (m_pixelMode[index]->speed == 0)
+    vTaskDelete(NULL); // 删除当前任务
 }
 
 void LightStripMode_4(uint8_t index)
@@ -469,6 +506,36 @@ void LightStripMode_14(uint8_t index)
 }
 
 void LightStripMode_15(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_16(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_17(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_18(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_19(uint8_t index)
+{
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  vTaskDelete(NULL); // 删除当前任务
+}
+
+void LightStripMode_20(uint8_t index)
 {
   vTaskDelay(1000 / portTICK_PERIOD_MS);
   vTaskDelete(NULL); // 删除当前任务
